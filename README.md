@@ -377,7 +377,77 @@ write(ev, EV_SYN, 0, 0);      // 同步
 
 用 shell 拼 `sendevent ...; usleep 40000; sendevent ...` 在交互终端里没问题，但**经后台服务执行时 `usleep` 不一定生效**，两条命令落进同一个 jiffy，于是产生垃圾键码。**在 Java 里自己控制时序最可靠。**
 
-### 5. 按键卡住会造成「连跳」
+### 5. 有些系统悬浮窗永远收不到按键（TCL 悬浮菜单）
+
+TCL 电视上有个右侧竖条快捷面板（菜单 / 房子 / 返回 / 电源），长按摇杆中心唤出。
+它的真相需要看窗口属性才能明白：
+
+```bash
+adb shell dumpsys window windows | grep -A5 "ty=2005"
+# mAttrs=WM.LayoutParams{... ty=2005 fl=#8010138 ...}
+```
+
+把 flags 拆开：
+
+| 位 | 含义 |
+| --- | --- |
+| `0x8` | **`FLAG_NOT_FOCUSABLE`** |
+| `0x10` | `FLAG_NOT_TOUCHABLE` |
+| `0x20` | `FLAG_NOT_TOUCH_MODAL` |
+| `0x100` | `FLAG_WATCH_OUTSIDE_TOUCH` |
+| `0x10000` | `FLAG_FULLSCREEN` |
+
+`FLAG_NOT_FOCUSABLE` 意味着 **Android 永远不会把按键分发给这个窗口**。
+所以无论用 `sendevent` 写输入设备，还是 `input keyevent`，
+事件都会落到它下面的 Activity（`mCurrentFocus` 始终是底层 Activity，不是面板）。
+
+触摸也不行——`FLAG_NOT_TOUCHABLE`。
+
+**这类窗口是给实体面板键设计的，程序侧无法用方向键导航。**
+不要在这上面浪费时间调键码——它不是在正确的方向上失败，是根本不在那个通道上。
+
+那怎么唤起它？反编译宿主 APK 可以找到答案。以
+`/system/app/TCL_MenuHelp5.apk`（包名 `com.tcl.m`）为例：
+
+```bash
+apktool d -f -o out TCL_MenuHelp5.apk
+grep -r "const-string" out/smali/com/tcl/m/MenuBroadcastReceiver.smali
+```
+
+它的 `onReceive` 读取 extra `"key"`，支持这些值：
+
+| key 值 | 动作 |
+| --- | --- |
+| `longok` | 长按确定 → 显示/收起悬浮面板 |
+| `shortok` | 短按确定 |
+| `pindaojia` / `pindaojian` | 频道 +/- 按下 |
+| `pindaojia_up` / `pindaojian_up` | 频道 +/- 抬起 |
+| `yinliangjia` / `yinliangjian` | 音量 +/- 按下 |
+| `yinliangjia_up` / `yinliangjian_up` | 音量 +/- 抬起 |
+
+注意：**没有方向键**。所以唤起用广播：
+
+```bash
+adb shell am broadcast -a com.tcl.m.MenuBroadcastReceiver --es key longok
+```
+
+再发一次即收起（receiver 内部有 `isVisiable()` 分支会 dismiss）。
+
+### 6. 通用思路：键码不对时，去看宿主 APK
+
+遇到「某个界面按键无效」，先判断它是不是独立窗口：
+
+```bash
+adb shell dumpsys window windows | grep -E "Window #|mCurrentFocus|ty="
+```
+
+- `mCurrentFocus` 指向它 → 它接收按键，问题在键码
+- `mCurrentFocus` 指向别人 → 它不接收按键，问题在窗口标志，键码怎么调都没用
+
+找到宿主包名后（看 `mOwnerUid` → `pm list packages --uid N`），反编译找广播/Intent 入口，
+比盲试键码快得多。
+
+### 7. 按键卡住会造成「连跳」
 
 如果只发出了「按下」而「松开」丢失，系统会认为键一直被按住并自动连发 —— 表现是「按一下左，光标直接跳到最左边」。
 
@@ -389,7 +459,7 @@ getevent -pl /dev/input/event0     # 被按住的键会带 * 标记
 
 修复：确保每条代码路径都会发 release；进程退出/异常时补发 release。
 
-### 6. 音量：`AudioManager` 在这台机器上是空转
+### 8. 音量：`AudioManager` 在这台机器上是空转
 
 | 尝试 | 结果 |
 | --- | --- |
@@ -401,7 +471,7 @@ getevent -pl /dev/input/event0     # 被按住的键会带 * 标记
 这台电视的真实音量走厂商私有通道，只有音量键能触达。
 另外**它没有硬上限**（连续加能到 65+），代码里不要假设 `15/27` 这类天花板。
 
-### 7. 截图：`screencap` 慢，且重定向会写 0 字节
+### 9. 截图：`screencap` 慢，且重定向会写 0 字节
 
 - `screencap` 在旧 SoC 上约 **7 秒**
 - 如果执行环境给命令加了 `> 某文件`，`screencap -p 目标` 的输出会被重定向吞掉，得到 **0 字节文件**
@@ -409,7 +479,7 @@ getevent -pl /dev/input/event0     # 被按住的键会带 * 标记
 
 正确做法：后台启动截图 → 轮询文件「大小 + 修改时间」连续两次一致 → 读取 → 立刻删除。
 
-### 8. 网页 UI 用实体文件，别用字符串拼
+### 10. 网页 UI 用实体文件，别用字符串拼
 
 早期把 HTML 拼在 Java 字符串里，一个转义符号出错就会让整段 `<script>` 静默失效 —— 页面看着正常，所有按钮都没反应。
 
@@ -419,7 +489,7 @@ getevent -pl /dev/input/event0     # 被按住的键会带 * 标记
 node --check page.js
 ```
 
-### 9. 焦点动画会拖垮老芯片
+### 11. 焦点动画会拖垮老芯片
 
 毛玻璃卡片每次获得焦点都重建 `LinearGradient` 并做缩放动画，在 2016 年的 SoC 上表现为**闪烁**。
 
@@ -427,7 +497,7 @@ node --check page.js
 - 焦点切换只更新描边颜色，不重建渐变
 - 去掉 `scaleX/scaleY` 缩放动画
 
-### 10. 回到前台后按键失灵
+### 12. 回到前台后按键失灵
 
 `WebRemote.attach(activity)` 如果只写在 `onCreate()`，Activity 被复用后句柄会指向旧窗口。
 **必须在每个 Activity 的 `onResume()` 里重新 attach。**
