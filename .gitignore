@@ -1,0 +1,29 @@
+# 构建产物
+project-newui/build/
+*.apk
+*.dex
+*.class
+
+# 平台签名密钥（绝对不能提交）
+*.pk8
+*.x509.pem
+*.pem
+*.keystore
+*.jks
+
+# 本地配置
+local.properties
+.gradle/
+
+# 系统垃圾
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Python
+__pycache__/
+*.pyc
+
+# 临时文件
+*.log
+*.tmp

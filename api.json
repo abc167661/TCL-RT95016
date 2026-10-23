@@ -1,0 +1,155 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SkyHome WebRemote",
+    "version": "1.0.0",
+    "description": "局域网内控制 Android TV (API 17) 的 HTTP 遥控服务。按键通过写内核输入设备 /dev/input/event0 实现，可作用于任意前台应用。无认证，仅放行私有网段。",
+    "x-verified-on": {
+      "vendor": "TCL",
+      "chipset": "Realtek RTD299x",
+      "firmware": "V8-RT95016-LF1V506",
+      "android": "4.2.1",
+      "apiLevel": 17,
+      "abi": "armeabi-v7a"
+    }
+  },
+  "servers": [
+    { "url": "http://{tvIp}:8087", "variables": { "tvIp": { "default": "192.168.1.20" } } }
+  ],
+  "paths": {
+    "/api/sys": {
+      "get": {
+        "summary": "硬件监控",
+        "operationId": "getSys",
+        "responses": {
+          "200": {
+            "description": "内存/CPU/存储/负载",
+            "content": { "application/json": { "example": {
+              "ramTotal": 957, "ramUsed": 498, "ramAvail": 459, "ramPct": 52, "lowMem": false,
+              "cpuPct": 22, "cores": 2, "load": "2.50 2.19 1.13",
+              "storage": [
+                { "name": "内部存储", "path": "/data", "total": 2191, "used": 809, "free": 1382, "pct": 36 },
+                { "name": "SD卡", "path": "/mnt/sdcard", "total": 2191, "used": 809, "free": 1382, "pct": 36 }
+              ],
+              "uptime": "0h8m"
+            } } }
+          }
+        }
+      }
+    },
+    "/api/state": {
+      "get": {
+        "summary": "设备型号、SDK、音量",
+        "operationId": "getState",
+        "responses": { "200": { "description": "设备状态" } }
+      }
+    },
+    "/api/diag": {
+      "get": {
+        "summary": "调试信息：前台 Activity、焦点控件、最后按键",
+        "operationId": "getDiag",
+        "responses": { "200": { "description": "诊断",
+          "content": { "application/json": { "example": {
+            "activity": "MainActivity", "focus": "GlassCard#2130968611", "lastKey": 105, "log": ""
+          } } } } }
+      }
+    },
+    "/api/key": {
+      "get": {
+        "summary": "发送按键",
+        "operationId": "sendKey",
+        "parameters": [{
+          "name": "c", "in": "query", "required": true,
+          "schema": { "type": "string", "enum": ["up", "down", "left", "right", "ok", "back", "home", "menu"] }
+        }],
+        "responses": { "200": { "description": "{ok:true}" } }
+      }
+    },
+    "/api/vol": {
+      "get": {
+        "summary": "音量增减（走厂商 HAL，需 root）",
+        "operationId": "adjustVolume",
+        "parameters": [{ "name": "d", "in": "query", "required": true, "schema": { "type": "integer", "enum": [1, -1] } }],
+        "responses": { "200": { "description": "{ok:true, volume:N}" } }
+      }
+    },
+    "/api/tiles": {
+      "get": { "summary": "首页卡片列表", "operationId": "listTiles",
+        "responses": { "200": { "description": "[{i,label}]",
+          "content": { "application/json": { "example": [
+            { "i": 0, "label": "直播" }, { "i": 1, "label": "电视" },
+            { "i": 2, "label": "云视听小电视" }, { "i": 3, "label": "更多应用 4" }
+          ] } } } } }
+    },
+    "/api/tile": {
+      "get": { "summary": "打开第 N 张卡片", "operationId": "openTile",
+        "parameters": [{ "name": "i", "in": "query", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "{ok:true}" } } }
+    },
+    "/api/tilemove": {
+      "get": { "summary": "移动卡片顺序（持久化）", "operationId": "moveTile",
+        "parameters": [
+          { "name": "i", "in": "query", "required": true, "schema": { "type": "integer" } },
+          { "name": "d", "in": "query", "required": true, "schema": { "type": "integer", "enum": [1, -1] } }
+        ],
+        "responses": { "200": { "description": "{ok:bool}；越界返回 ok:false" } } }
+    },
+    "/api/apps": {
+      "get": { "summary": "应用列表（按用户自定义顺序）", "operationId": "listApps",
+        "responses": { "200": { "description": "[{label,pkg,system}]" } } }
+    },
+    "/api/appmove": {
+      "get": { "summary": "移动应用顺序（持久化）", "operationId": "moveApp",
+        "parameters": [
+          { "name": "pkg", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "d", "in": "query", "required": true, "schema": { "type": "integer", "enum": [1, -1] } }
+        ],
+        "responses": { "200": { "description": "{ok:bool}" } } }
+    },
+    "/api/launch": {
+      "get": { "summary": "启动应用", "operationId": "launchApp",
+        "parameters": [{ "name": "pkg", "in": "query", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "{ok:bool}" } } }
+    },
+    "/api/drawer": {
+      "get": { "summary": "打开应用抽屉", "operationId": "openDrawer",
+        "responses": { "200": { "description": "{ok:true}" } } }
+    },
+    "/api/back": {
+      "get": { "summary": "关闭当前面板", "operationId": "closeSheet",
+        "responses": { "200": { "description": "{ok:true}" } } }
+    },
+    "/api/install": {
+      "get": { "summary": "打开安装面板", "operationId": "openInstall",
+        "responses": { "200": { "description": "{ok:true}" } } }
+    },
+    "/api/wallpaper": {
+      "get": { "summary": "切换下一张壁纸", "operationId": "nextWallpaper",
+        "responses": { "200": { "description": "{ok:true}" } } }
+    },
+    "/api/channels": {
+      "get": { "summary": "频道列表", "operationId": "listChannels",
+        "responses": { "200": { "description": "[{label,index}]" } } }
+    },
+    "/api/live": {
+      "get": { "summary": "切到第 N 个频道", "operationId": "playChannel",
+        "parameters": [{ "name": "ch", "in": "query", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "{ok:true}" } } }
+    },
+    "/api/shot": {
+      "get": { "summary": "当前画面截图（JPEG 960x540，约 8-10 秒；视频层为黑帧）",
+        "operationId": "screenshot",
+        "responses": { "200": { "description": "JPEG", "content": { "image/jpeg": {} } },
+                       "500": { "description": "截图失败" } } }
+    },
+    "/api/clean": {
+      "get": { "summary": "扫描并删除残留 APK（有破坏性）", "operationId": "cleanApks",
+        "responses": { "200": { "description": "{ok,freed,count}" } } }
+    },
+    "/up": {
+      "post": { "summary": "上传 APK 并静默安装", "operationId": "uploadApk",
+        "requestBody": { "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } } },
+        "responses": { "200": { "description": "{ok:bool}" } } }
+    }
+  }
+}

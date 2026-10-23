@@ -1,0 +1,53 @@
+# SkyHome WebRemote
+
+> 局域网内控制 Android TV（API 17）的 HTTP 遥控服务。单端口 8087，返回 JSON；
+> 按键通过写内核输入设备实现，可作用于任意前台应用。
+
+## 事实（仅代表验证机，不要当通用值）
+
+- 验证机型：TCL 电视 / Realtek RTD299x / 固件 V8-RT95016-LF1V506 / Android 4.2.1 (API 17) / armeabi-v7a
+
+## ⚠️ 换机型必读
+
+下面的设备节点和键码是**验证机**的探测结果，别的电视几乎不会相同。
+接手新机器先跑 `python probe_tv_input.py <TV_IP>:5555`，用它的输出覆盖这些值，
+再做一次真实注入实测。抄样本值是不工作的最常见原因。
+- 服务端口：8087（HTTP，无认证，仅私有网段）
+- 按键设备：/dev/input/event0 (venus_IR_input)
+- 键码：UP=103 DOWN=108 LEFT=105 RIGHT=106 SELECT=28 BACK=158 HOME=102 MENU=139 VOL+=115 VOL-=114
+
+## 核心约束
+
+1. 只允许替换 /system/app/SkyHome.apk，禁止改动 init.rc / inetd.conf / sserver / persist.*
+2. 「接口返回 ok」不等于成功，判据必须是副作用（前台 Activity / 日志 / 画面差异 / SHA256）
+3. 不要修改键码，event0 + 28=OK 已经双重验证
+
+## 常用调用
+
+- GET /api/diag     → 前台 Activity、焦点控件、最后按键
+- GET /api/sys      → ramUsed/ramTotal/ramPct/cpuPct/cores/load/storage[]/uptime
+- GET /api/key?c=up|down|left|right|ok|back|home|menu
+- GET /api/vol?d=1|-1
+- GET /api/tiles    → [{i, label}]
+- GET /api/tile?i=N → 打开第 N 张卡片
+- GET /api/apps     → [{label, pkg, system}]
+- GET /api/launch?pkg=…
+- GET /api/shot     → image/jpeg (960x540, 约 8-10 秒)
+- GET /api/live?ch=N
+- POST /up          → 上传 APK 并安装
+- GET /api/clean    → 删除残留 APK（有副作用）
+
+## 超时
+
+读取 5s / 按键 15s / 截图 45s / 上传 300s
+
+## 已知限制
+
+- 视频层截图为黑帧（硬件叠加层）
+- 服务单线程，勿并发发按键
+- 无认证，仅限可信局域网
+- 设备存在 0.0.0.0:8090 的 root 命令通道（无认证），不要暴露公网
+
+## 更多
+
+见 webremote.md（完整文档）、api.json（OpenAPI）、AGENTS.md（agent 操作约束）
