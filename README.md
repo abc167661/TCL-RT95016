@@ -287,7 +287,10 @@ http://<TV_IP>:8087
 | `GET` | `/api/appmove` | `pkg=…&d=±1` | 移动应用顺序 |
 | `GET` | `/api/launch` | `pkg=…` | 启动应用 |
 | `GET` | `/api/drawer` | — | 打开应用抽屉 |
-| `GET` | `/api/back` | — | 关闭当前面板 |
+| `GET` | `/api/back` | — | 关闭应用内面板（对 TCL 悬浮菜单无效） |
+| `GET` | `/api/gohome` | — | 回到桌面（任意界面可用） |
+| `GET` | `/api/hardback` | — | 发送真实 BACK 键到当前前台窗口 |
+| `GET` | `/api/power` | — | 电源键（待机 / 唤醒） |
 | `GET` | `/api/install` | — | 打开安装面板（选 APK / 上传页入口） |
 | `GET` | `/api/wallpaper` | — | 切换到下一张本地壁纸 |
 | `GET` | `/api/channels` | — | 频道列表（名称 + 当前可用源） |
