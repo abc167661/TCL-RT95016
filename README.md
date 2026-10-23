@@ -177,7 +177,7 @@ sha256sum -c release/SkyHome-1.0.apk.sha256
 装完第一件事：
 
 ```bash
-python probe_tv_input.py <TV_IP>:5555
+python tools/probe_tv_input.py <TV_IP>:5555
 ```
 
 它会告诉你这台机器该用哪个设备节点和键码。详见 [适配其他机型](#适配其他机型给-ai-的探测流程)。
@@ -443,9 +443,9 @@ node --check page.js
 
 | 文件 | 用途 |
 | --- | --- |
-| `llms.txt` | 精简单页说明，符合 [llms.txt](https://llmstxt.org/) 约定，供模型快速摄取 |
-| `api.json` | OpenAPI 3.0 描述，可直接喂给支持 tool-calling 的框架 |
-| `AGENTS.md` | 给编码 agent 的操作约束：能改什么、不能碰什么、验收怎么判 |
+| `docs/llms.txt` | 精简单页说明，符合 [llms.txt](https://llmstxt.org/) 约定，供模型快速摄取 |
+| `api/openapi.json` | OpenAPI 3.0 描述，可直接喂给支持 tool-calling 的框架 |
+| `docs/AGENTS.md` | 给编码 agent 的操作约束：能改什么、不能碰什么、验收怎么判 |
 
 ### 三条硬约束（agent 必读）
 
@@ -701,7 +701,7 @@ curl -s http://<TV_IP>:8087/api/diag | grep keyDevice
 仓库里已经带了这个脚本，直接跑即可：
 
 ```bash
-python probe_tv_input.py <TV_IP>:5555
+python tools/probe_tv_input.py <TV_IP>:5555
 ```
 
 它会把上面 ①②③④ 四步全做完，并直接打印出**适合你这台机器的配置**，形如：
