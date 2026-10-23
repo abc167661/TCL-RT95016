@@ -103,6 +103,85 @@
 
 关键点：**遥控不是「往自己 App 里塞按键」，而是写内核输入设备**，所以能在任意第三方 App 里生效。
 
+## 直接安装（不用编译）
+
+`release/SkyHome-1.0.apk` 是已经编译、签名、验证过的成品。
+
+```bash
+adb connect <TV_IP>:5555
+adb install -r release/SkyHome-1.0.apk
+```
+
+### 安装前必须确认三件事
+
+| 检查 | 命令 | 期望 |
+| --- | --- | --- |
+| 系统版本够不够 | `adb shell getprop ro.build.version.sdk` | **≥ 17**（Android 4.2） |
+| CPU 架构对不对 | `adb shell getprop ro.product.cpu.abi` | 含 `armeabi-v7a` |
+| 能不能覆盖安装 | 见下方说明 | — |
+
+### 关于签名（重要）
+
+这个 APK 用的是 **AOSP 公开测试平台密钥**（`CN=Android`，SHA-1 `27196e386b875e76adf700e7ea84e4c6eee33dfa`），
+不是某台机器独有的密钥。这带来两个结果：
+
+- ✅ **可以直装在同样使用 AOSP testkey 的设备上**（2015 年前后不少国产电视就是）
+- ⚠️ **如果你的电视用的是厂商私有平台密钥**，`adb install` 会报
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE` 或签名冲突
+
+**第一步先试普通安装**：
+
+```bash
+adb install -r release/SkyHome-1.0.apk
+```
+
+- 成功 → 装成普通应用，能用遥控台，但**不能接管 HOME 键**
+- 失败（签名冲突）→ 需要系统权限，走下面的「装成系统应用」
+
+### 装成系统应用（接管 HOME 键）
+
+```bash
+adb root                      # 需要设备支持
+adb remount                   # 或 adb shell "mount -o rw,remount /system"
+adb push release/SkyHome-1.0.apk /system/app/SkyHome.apk
+adb shell chmod 644 /system/app/SkyHome.apk
+adb shell sync
+adb reboot
+```
+
+重启后按 HOME 键即进入 SkyHome。
+
+> ⚠️ **只替换 `/system/app/SkyHome.apk` 这一个文件。**
+> 不要动 `init.rc`、`inetd.conf`、`persist.*`——这些是开机链路，写错电视起不来。
+
+### 校验下载完整性
+
+```bash
+sha256sum -c release/SkyHome-1.0.apk.sha256
+# 应输出: SkyHome-1.0.apk: OK
+```
+
+### 装不上怎么办
+
+| 报错 | 原因 | 处理 |
+| --- | --- | --- |
+| `INSTALL_FAILED_OLDER_SDK` | 系统低于 API 17 | 无解，这套只支持 4.2+ |
+| `INSTALL_FAILED_CPU_ABI_INCOMPATIBLE` | CPU 架构不符 | 无解，只有 armeabi-v7a |
+| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | 签名冲突 | 先 `pm uninstall com.cleantv.ui`，或改用系统应用方式 |
+| `INSTALL_FAILED_VERIFICATION_FAILURE` | 系统校验器拦截 | `adb shell settings put global verifier_verify_adb_installs 0` 后重试 |
+| `INSTALL_PARSE_FAILED_NO_CERTIFICATES` | 下载损坏 | 重下并用 sha256 校验 |
+
+### 装完先跑探测
+
+即使装上了，**按键也可能不工作**——因为不同机型的输入设备不同。
+装完第一件事：
+
+```bash
+python probe_tv_input.py <TV_IP>:5555
+```
+
+它会告诉你这台机器该用哪个设备节点和键码。详见 [适配其他机型](#适配其他机型给-ai-的探测流程)。
+
 ## 快速开始
 
 ### 前置条件

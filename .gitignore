@@ -1,8 +1,12 @@
-# 构建产物
+# 构建产物（临时产物不上传）
 project-newui/build/
-*.apk
 *.dex
 *.class
+
+# 但 release 目录下发布用的 APK 要上传
+!release/
+!release/*.apk
+!release/*.sha256
 
 # 平台签名密钥（绝对不能提交）
 *.pk8
